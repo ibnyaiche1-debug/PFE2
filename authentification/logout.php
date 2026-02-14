@@ -1,10 +1,16 @@
 <?php
-// authentification/logout.php
+require_once __DIR__ . '/../includes/authentification.php';
 
-// Start session (if not started)
 if (session_status() === PHP_SESSION_NONE) {
     session_start();
 }
+
+// Fallback if $BASE_URL is not defined by includes
+if (!isset($BASE_URL) || !$BASE_URL) {
+    // If script path is like /stage_platform/authentification/login.php => BASE_URL becomes /stage_platform
+    $BASE_URL = rtrim(dirname(dirname($_SERVER['SCRIPT_NAME'])), '/');
+}
+// authentification/logout.php
 
 // Clear all session data
 $_SESSION = [];
@@ -27,5 +33,5 @@ if (ini_get("session.use_cookies")) {
 session_destroy();
 
 // Redirect to login (or index)
-header("Location: /stage_platform/authentification/login.php");
+header("Location: " . $BASE_URL . "/authentification/login.php");
 exit;

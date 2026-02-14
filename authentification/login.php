@@ -1,59 +1,46 @@
 <?php
-// authentification/login.php
-
 require_once __DIR__ . '/../config/connection.php';
 require_once __DIR__ . '/../includes/authentification.php';
-
-function redirectByRole(string $role): void
-{
-    $role = strtolower(trim($role));
-
-    if ($role === 'stagiaire') {
-        redirect('/stage_platform/stagiaire/dashboard.php');
-    } elseif ($role === 'entreprise') {
-        redirect('/stage_platform/entreprise/dashboard.php');
-    } elseif ($role === 'admin') {
-        redirect('/stage_platform/admin/dashboard.php');
-    } else {
-        session_destroy();
-        die("Rôle invalide.");
-    }
+if (session_status() === PHP_SESSION_NONE) {
+    session_start();
 }
 
-// If already logged in, redirect to dashboard
-if (isLoggedIn()) {
-    redirectByRole($_SESSION['role']);
+// Fallback if $BASE_URL is not defined by includes
+if (!isset($BASE_URL) || !$BASE_URL) {
+    // If script path is like /stage_platform/authentification/login.php => BASE_URL becomes /stage_platform
+    $BASE_URL = rtrim(dirname(dirname($_SERVER['SCRIPT_NAME'])), '/');
 }
 
-$error = '';
 
-if ($_SERVER['REQUEST_METHOD'] === 'POST') {
-    $email = trim($_POST['email'] ?? '');
-    $pass  = $_POST['mot_de_passe'] ?? '';
+$error = "";
 
-    if ($email === '' || $pass === '') {
-        $error = "Veuillez remplir tous les champs.";
-    } else {
-        $stmt = $pdo->prepare("SELECT id_utilisateur, email, mot_de_passe, role FROM utilisateur WHERE email = ? LIMIT 1");
-        $stmt->execute([$email]);
-        $user = $stmt->fetch();
+if ($_SERVER["REQUEST_METHOD"] == "POST") {
+    $email = $_POST["email"];
+    $pw = $_POST["mot_de_passe"];
 
-        // Verify password (bcrypt)
-        if ($user && password_verify($pass, $user['mot_de_passe'])) {
+    $stmt = $pdo->prepare("SELECT * FROM utilisateur WHERE email = ?");
+    $stmt->execute([$email]);
+    $user = $stmt->fetch(PDO::FETCH_ASSOC);
 
-            // Set session values
-            $_SESSION['id_utilisateur'] = $user['id_utilisateur'];
-            $_SESSION['role'] = $user['role'];
+    if ($user && password_verify($pw, $user["mot_de_passe"])) {
+        $_SESSION["id_utilisateur"] = $user["id_utilisateur"]; // expected by isLoggedIn()/dashboards
+        $_SESSION["user_id"] = $user["id_utilisateur"]; // optional alias
+        $_SESSION["role"] = $user["role"];
 
-            // Redirect by role
-            redirectByRole($user['role']);
-
-        } else {
-            $error = "Email ou mot de passe incorrect.";
+        if ($user["role"] == "admin") {
+            header("Location: $BASE_URL/admin/dashboard.php");
+        } elseif ($user["role"] == "entreprise") {
+            header("Location: $BASE_URL/entreprise/dashboard.php");
+        } elseif ($user["role"] == "stagiaire") {
+            header("Location: $BASE_URL/stagiaire/dashboard.php");
         }
+        exit();
+    } else {
+        $error = "Email ou mot de passe incorrect.";
     }
 }
 ?>
+
 <!DOCTYPE html>
 <html lang="fr">
 <head>
@@ -66,8 +53,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     <!-- Icons -->
     <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css" rel="stylesheet">
 
-    <!-- Your CSS -->
-    <link rel="stylesheet" href="/stage_platform/assets/style.css">
+    <!-- Your CSS (same design as login.php) -->
+    <link rel="stylesheet" href="<?= htmlspecialchars($BASE_URL) ?>/assets/style.css">
 </head>
 
 <body>
@@ -78,7 +65,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     <div class="wrap">
         <div class="container py-4 py-md-5">
             <div class="d-flex align-items-center justify-content-between mb-4">
-                <a class="brand" href="/stage_platform/index.php">
+                <a class="brand" href="<?= $BASE_URL ?>/index.php">
                     <span class="brand-badge"><i class="bi bi-briefcase-fill"></i></span>
                     <div>
                         <div class="fw-bold">InternGo</div>
@@ -86,7 +73,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     </div>
                 </a>
 
-                <a class="chip" href="/stage_platform/authentification/register.php">
+                <a class="chip" href="<?= htmlspecialchars($BASE_URL) ?>/authentification/register.php">
                     <i class="bi bi-person-plus"></i>
                     Créer un compte
                 </a>
@@ -111,7 +98,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                                     <i class="bi bi-check2-circle fs-5" style="color:#22c55e;"></i>
                                     <div>
                                         <div class="fw-semibold">Simple & rapide</div>
-                                        <div class="small muted">Interface claire, facile à postuler.</div>
+                                        <div class="small muted">Interface claire, facile à utiliser.</div>
                                     </div>
                                 </div>
 
@@ -119,7 +106,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                                     <i class="bi bi-shield-check fs-5" style="color:#38bdf8;"></i>
                                     <div>
                                         <div class="fw-semibold">Sécurisé</div>
-                                        <div class="small muted">Sessions selon le rôle + données protégées.</div>
+                                        <div class="small muted">Accès selon le rôle + données protégées.</div>
                                     </div>
                                 </div>
 
@@ -127,7 +114,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                                     <i class="bi bi-graph-up-arrow fs-5" style="color:#a78bfa;"></i>
                                     <div>
                                         <div class="fw-semibold">Suivi</div>
-                                        <div class="small muted">Statuts candidatures & validation des offres.</div>
+                                        <div class="small muted">Consultez vos statuts et activités.</div>
                                     </div>
                                 </div>
                             </div>
@@ -138,10 +125,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                                     <h2 class="h4 fw-bold mb-1">Connexion</h2>
                                     <p class="muted mb-4">Accédez à votre espace.</p>
 
-                                    <?php if ($error): ?>
+                                    <?php if (!empty($error)) : ?>
                                         <div class="alert d-flex align-items-center gap-2" role="alert">
                                             <i class="bi bi-exclamation-triangle-fill"></i>
-                                            <div><?php echo htmlspecialchars($error); ?></div>
+                                            <div><?= htmlspecialchars($error) ?></div>
                                         </div>
                                     <?php endif; ?>
 
@@ -156,7 +143,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                                                     class="form-control"
                                                     placeholder="nom@email.com"
                                                     required
-                                                    value="<?php echo htmlspecialchars($_POST['email'] ?? ''); ?>"
+                                                    value="<?= htmlspecialchars($_POST['email'] ?? '') ?>"
                                                 >
                                             </div>
                                         </div>
@@ -191,7 +178,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
                                         <div class="text-center mt-3 small">
                                             <span class="muted">Pas de compte ?</span>
-                                            <a class="link" href="/stage_platform/authentification/register.php">Créer un compte</a>
+                                            <a class="link" href="<?= htmlspecialchars($BASE_URL) ?>/authentification/register.php">Créer un compte</a>
                                         </div>
                                     </form>
                                 </div>
@@ -205,7 +192,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     </div>
 
                     <div class="text-center small muted mt-4">
-                        © <?php echo date('Y'); ?> InternGo
+                        © <?= date('Y') ?> InternGo
                     </div>
                 </div>
             </div>
@@ -214,7 +201,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
     <!-- Bootstrap JS -->
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
-    <!-- Your JS -->
-    <script src="/stage_platform/assets/script.js"></script>
+    <!-- Your JS (same as login.php) -->
+    <script src="<?= $BASE_URL ?>/assets/script.js"></script>
 </body>
 </html>
