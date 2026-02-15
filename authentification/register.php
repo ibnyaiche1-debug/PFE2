@@ -1,33 +1,46 @@
-<?php 
+<?php
 // authentification/register.php
+if (session_status() === PHP_SESSION_NONE) { session_start(); }
 
-require_once __DIR__ . '/../config/connection.php';
-require_once __DIR__ . '/../includes/authentification.php';
-
-
-if (session_status() === PHP_SESSION_NONE) {
-    session_start();
+// Load BASE_URL (optional)
+$BASE_URL = $BASE_URL ?? null;
+foreach ([__DIR__ . '/../config/paths.php', __DIR__ . '/../paths.php', __DIR__ . '/../config.php'] as $p) {
+    if (!$BASE_URL && file_exists($p)) { require_once $p; }
 }
-
-// Fallback if $BASE_URL is not defined by includes
-if (!isset($BASE_URL) || !$BASE_URL) {
-    // If script path is like /stage_platform/authentification/login.php => BASE_URL becomes /stage_platform
-    $BASE_URL = rtrim(dirname(dirname($_SERVER['SCRIPT_NAME'])), '/');
+if ($BASE_URL && preg_match('~^https?://~i', $BASE_URL)) {
+    // Normalize FULL URL to PATH only
+    $parts = parse_url($BASE_URL);
+    $BASE_URL = $parts['path'] ?? '';
 }
+$BASE_URL = rtrim((string)$BASE_URL, '/');
+if (!$BASE_URL) { $BASE_URL = rtrim(dirname(dirname($_SERVER['SCRIPT_NAME'])), '/'); }
 
+// Load DB connection (expects $pdo as in your connection.php)
+foreach ([__DIR__ . '/../config/connection.php', __DIR__ . '/../connection.php'] as $p) {
+    if (file_exists($p)) { require_once $p; break; }
+}
+if (!isset($pdo) || !($pdo instanceof PDO)) { die("Database connection failed"); }
 
+function redirect(string $path): void {
+    global $BASE_URL;
+    $path = ltrim($path, '/');
+    header("Location: " . rtrim($BASE_URL, '/') . "/" . $path);
+    exit;
+}
+function isLoggedIn(): bool {
+    return isset($_SESSION['id_utilisateur']) && (int)$_SESSION['id_utilisateur'] > 0;
+}
 
 function redirectByRole(string $role): void
 {
-    global $BASE_URL;
-$role = strtolower(trim($role));
+    $role = strtolower(trim($role));
 
     if ($role === 'stagiaire') {
-        redirect($BASE_URL . '/stagiaire/dashboard.php');
+        redirect('stagiaire/dashboard.php');
     } elseif ($role === 'entreprise') {
-        redirect($BASE_URL . '/entreprise/dashboard.php');
+        redirect('entreprise/dashboard.php');
     } elseif ($role === 'admin') {
-        redirect($BASE_URL . '/admin/dashboard.php');
+        redirect('admin/dashboard.php');
     } else {
         session_destroy();
         die("Rôle invalide.");
@@ -74,8 +87,8 @@ $error = '';
 $success = '';
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
-    $fullName = trim($_POST['nom_complet'] ?? '');
-    $email = trim($_POST['email'] ?? '');
+    $fullName = trim($_POST['nom'] ?? $_POST['nom_complet'] ?? $_POST['full_name'] ?? '');
+$email = trim($_POST['email'] ?? '');
     $pass  = $_POST['mot_de_passe'] ?? '';
     $role  = strtolower(trim($_POST['role'] ?? ''));
 
@@ -123,33 +136,42 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     $hash = password_hash($pass, PASSWORD_BCRYPT);
                     $hasFullName = userTableHasFullNameColumn($pdo);
 
-                    // Insert into utilisateur (kept like your original logic)
-                    if ($hasFullName) {
-                        $nameToStore = ($role === 'entreprise') ? $nomEntreprise : $fullName;
-                        $insertStmt = $pdo->prepare(
-                            "INSERT INTO utilisateur (nom, email, mot_de_passe, role) VALUES (?, ?, ?, ?)"
-                        );
-                        $insertStmt->execute([$nameToStore, $email, $hash, $role]);
-                    } else {
-                        $insertStmt = $pdo->prepare(
-                            "INSERT INTO utilisateur (email, mot_de_passe, role) VALUES (?, ?, ?)"
-                        );
-                        $insertStmt->execute([$email, $hash, $role]);
+                    // Insert into utilisateur (schema stage_platform.sql expects `nom`, `email`, `mot_de_passe`, `role`)
+                    $hash = password_hash($pass, PASSWORD_BCRYPT);
+
+                    // Name to store depends on role: entreprise => nom_entreprise, otherwise full name
+                    $nameToStore = ($role === 'entreprise') ? $nomEntreprise : $fullName;
+                    if ($nameToStore === '') {
+                        throw new Exception("Nom obligatoire");
                     }
+
+                    $insertStmt = $pdo->prepare(
+                        "INSERT INTO utilisateur (nom, email, mot_de_passe, role, date_inscription) VALUES (?, ?, ?, ?, CURDATE())"
+                    );
+                    $insertStmt->execute([$nameToStore, $email, $hash, $role]);
 
                     $newUserId = (int) $pdo->lastInsertId();
 
-                    // ✅ Insert into stagiaire using EXACT columns you provided:
-                    // id_utilisateur, nom, email, mot_de_passe, role, date_inscription
-                    if ($role === 'stagiaire') {
-                        $stagiaireStmt = $pdo->prepare(
-                            "INSERT INTO stagiaire (id_utilisateur, nom, email, mot_de_passe, role, date_inscription)
-                             VALUES (?, ?, ?, ?, ?, NOW())"
-                        );
-                        $stagiaireStmt->execute([$newUserId, $fullName, $email, $hash, $role]);
-                    }
+                    // ✅ Insert into stagiaire (FIXED):
+// Your DB design stores identity/login in `utilisateur`.
+// The `stagiaire` table should usually only reference `id_utilisateur` + profile fields (niveau_etude, filiere, ville, cv...).
+if ($role === 'stagiaire') {
+    // Detect available columns to avoid SQL errors if schema differs
+    $cols = ["id_utilisateur"];
+    $vals = [$newUserId];
 
-                    // Insert into entreprise table
+    // Common optional columns (based on your screenshots)
+    if (tableHasColumn($pdo, "stagiaire", "niveau_etude")) { $cols[] = "niveau_etude"; $vals[] = ""; }
+    if (tableHasColumn($pdo, "stagiaire", "filiere"))      { $cols[] = "filiere";      $vals[] = ""; }
+    if (tableHasColumn($pdo, "stagiaire", "ville"))        { $cols[] = "ville";        $vals[] = ""; }
+    if (tableHasColumn($pdo, "stagiaire", "cv"))           { $cols[] = "cv";           $vals[] = ""; }
+    if (tableHasColumn($pdo, "stagiaire", "date_inscription")) { $cols[] = "date_inscription"; $vals[] = date("Y-m-d"); }
+
+    $placeholders = implode(", ", array_fill(0, count($cols), "?"));
+    $sqlSt = "INSERT INTO stagiaire (" . implode(", ", $cols) . ") VALUES (" . $placeholders . ")";
+    $stagiaireStmt = $pdo->prepare($sqlSt);
+    $stagiaireStmt->execute($vals);
+}// Insert into entreprise table
                     if ($role === 'entreprise') {
                         $entrepriseStmt = $pdo->prepare(
                             "INSERT INTO entreprise (id_utilisateur, nom_entreprise, secteur_activite, ville, description)
@@ -161,8 +183,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     $pdo->commit();
 
                     $success = "Compte créé avec succès.";
-                    redirect($BASE_URL . '/authentification/login.php');
-                }
+                    header("Location: $BASE_URL/authentification/login.php");
+                    exit;
+                    }
             }
         } catch (PDOException $e) {
             if ($pdo->inTransaction()) {

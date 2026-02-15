@@ -1,12 +1,26 @@
 <?php
-require_once __DIR__ . '/../config/connection.php';
-require_once __DIR__ . '/../includes/authentification.php';
-if (session_status() === PHP_SESSION_NONE) {
-    session_start();
+if (session_status() === PHP_SESSION_NONE) { session_start(); }
+
+// Load BASE_URL (optional)
+$BASE_URL = $BASE_URL ?? null;
+foreach ([__DIR__ . '/../config/paths.php', __DIR__ . '/../paths.php', __DIR__ . '/../config.php'] as $p) {
+    if (!$BASE_URL && file_exists($p)) { require_once $p; }
 }
 
+// Load DB connection (expects $pdo as in your connection.php)
+foreach ([__DIR__ . '/../config/connection.php', __DIR__ . '/../connection.php'] as $p) {
+    if (file_exists($p)) { require_once $p; break; }
+}
+if (!isset($pdo) || !($pdo instanceof PDO)) { die("Database connection failed"); }
+
 // Fallback if $BASE_URL is not defined by includes
-if (!isset($BASE_URL) || !$BASE_URL) {
+if (isset($BASE_URL) && $BASE_URL && preg_match('~^https?://~i', $BASE_URL)) {
+    // If someone set BASE_URL as a FULL URL, normalize it to a PATH only.
+    $parts = parse_url($BASE_URL);
+    $BASE_URL = $parts['path'] ?? '';
+}
+$BASE_URL = rtrim((string)($BASE_URL ?? ''), '/');
+if ($BASE_URL === '') {
     // If script path is like /stage_platform/authentification/login.php => BASE_URL becomes /stage_platform
     $BASE_URL = rtrim(dirname(dirname($_SERVER['SCRIPT_NAME'])), '/');
 }
@@ -69,7 +83,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
                     <span class="brand-badge"><i class="bi bi-briefcase-fill"></i></span>
                     <div>
                         <div class="fw-bold">InternGo</div>
-                        <div class="small muted">Étudiants • Entreprises • Admin</div>
+                        <div class="small muted">Stagiaires • Entreprises • Admin</div>
                     </div>
                 </a>
 

@@ -9,7 +9,7 @@ require_once __DIR__ . "/../config/connection.php"; // <-- change if needed
 // Support both variable names
 $db = null;
 if (isset($pdo) && $pdo instanceof PDO) $db = $pdo;
-if (!$db && isset($pdo) && $pdo instanceof PDO) $db = $pdo;
+if (!$db && isset($conn) && $conn instanceof PDO) $db = $conn;
 if (!$db) { die("Erreur: connexion DB introuvable (PDO)."); }
 
 if (!isset($_SESSION["id_utilisateur"])) {
@@ -23,7 +23,7 @@ $idUtilisateur = (int)$_SESSION["id_utilisateur"];
 $stmtUser = $db->prepare("
   SELECT 
     u.id_utilisateur, u.nom, u.email, u.role, u.date_inscription,
-    s.id_stagiaire, s.niveau_etude, s.filiere, s.ville AS ville_stagiaire, s.cv
+    s.id_stagiaire, s.niveau_etude, s.filiere, s.ville AS ville_stagiaire, s.cv_path
   FROM utilisateur u
   LEFT JOIN stagiaire s ON s.id_utilisateur = u.id_utilisateur
   WHERE u.id_utilisateur = ?
@@ -93,7 +93,7 @@ $initial = strtoupper(substr($user["nom"] ?? "S", 0, 1));
       --stroke: rgba(255,255,255,.14);
       --text: rgba(255,255,255,.92);
       --muted: rgba(255,255,255,.68);
-      --shadow: 0 26px 70px rgba(0,0,0,.32);
+      --shadow: 0 26px 70px rgba(220, 19, 19, 0.32);
       --brand:#3b82f6;          /* professional blue */
       --brand2:#22c55e;         /* subtle success */
       --brand3:#06b6d4;         /* calm teal */
@@ -150,8 +150,8 @@ $initial = strtoupper(substr($user["nom"] ?? "S", 0, 1));
       content:"";
       position:absolute; inset:0;
       background:
-        radial-gradient(600px 240px at 10% 0%, rgba(96,165,250,.28)),
-        radial-gradient(600px 240px at 90% 0%, rgba(167,139,250,.24));
+        radial-gradient(600px 240px at 10% 0%, rgba(59,130,246,.22), transparent 60%),
+        radial-gradient(600px 240px at 90% 0%, rgba(6,182,212,.16), transparent 60%);
       opacity:.9;
       pointer-events:none;
     }
@@ -165,15 +165,12 @@ $initial = strtoupper(substr($user["nom"] ?? "S", 0, 1));
 
     .identity{ display:flex; align-items:center; gap:14px; min-width: 0; }
     .avatar{
-      width: 56px; height: 56px;
-      border-radius: 20px;
+      width: 52px; height: 52px; border-radius: 18px;
       display:grid; place-items:center;
-      background: linear-gradient(135deg, rgba(59,130,246,.95), rgba(6,182,212,.85));
-      color:#06121f;
-      font-weight: 1000;
-      font-size: 1rem;
-      box-shadow: 0 22px 55px rgba(59,130,246,.18);
+      font-weight: 800; font-size: 18px;
+      background: linear-gradient(135deg, rgba(59,130,246,.9), rgba(6,182,212,.85));
       border: 1px solid rgba(255,255,255,.22);
+      box-shadow: 0 16px 40px rgba(0,0,0,.25);
     }
     .who{ min-width:0; }
     .title{
@@ -199,7 +196,7 @@ $initial = strtoupper(substr($user["nom"] ?? "S", 0, 1));
       border: 1px solid rgba(255,255,255,.18);
       background: rgba(255,255,255,.07);
       color: var(--text);
-      font-weight: 850;
+      font-weight: 550;
       font-size: .82rem;
       margin-top: 8px;
     }
@@ -391,7 +388,29 @@ $initial = strtoupper(substr($user["nom"] ?? "S", 0, 1));
     }
       .meter .inner{ width: 66px; height: 66px; }
     }
-  </style>
+  
+    /* RESP_FIX_V2 */
+    @media (max-width: 992px){
+      .row1{ flex-wrap: wrap; }
+      .actions{ flex-wrap: wrap; }
+    }
+    @media (max-width: 768px){
+      .row1{ flex-direction: column; align-items: flex-start; }
+      .actions{ width: 100%; justify-content: flex-start; }
+      .actions a, .actions button{
+        flex: 1 1 calc(50% - 10px);
+        justify-content: center;
+        text-align: center;
+      }
+      .tabs{ grid-template-columns: repeat(2, minmax(0,1fr)); }
+      .tab{ justify-content: center; }
+    }
+    @media (max-width: 420px){
+      .actions a, .actions button{ flex: 1 1 100%; }
+      .tabs{ grid-template-columns: 1fr; }
+    }
+
+</style>
 </head>
 
 <body>
@@ -408,7 +427,7 @@ $initial = strtoupper(substr($user["nom"] ?? "S", 0, 1));
           <div class="identity">
             <div class="avatar"><?= safe($initial) ?></div>
             <div class="who">
-              <h1 class="title">Internship Profile</h1>
+              <h1 class="title">Profile</h1>
               <div class="subtitle"><?= safe($user["nom"] ?? "Stagiaire") ?> — <?= safe($user["email"] ?? "") ?></div>
               <div class="badge-pill"><i class="bi bi-briefcase-fill"></i> Profil stagiaire • Espace carrière</div>
             </div>
@@ -424,10 +443,8 @@ $initial = strtoupper(substr($user["nom"] ?? "S", 0, 1));
 
       <div class="tabs">
         <a class="tab" href="../stagiaire/dashboard.php"><i class="bi bi-speedometer2"></i> Dashboard</a>
-        <a class="tab active" href="../stagiaire/profil.php"><i class="bi bi-person-badge"></i> Profil</a>
-        <a class="tab" href="../stagiaire/offres.php"><i class="bi bi-search"></i> Explorer</a>
+        <a class="tab active" href="../stagiaire/profile.php"><i class="bi bi-person-badge"></i> Profil</a>
         <a class="tab" href="../stagiaire/candidatures.php"><i class="bi bi-send-check"></i> Candidatures</a>
-        <a class="tab" href="../stagiaire/cv.php"><i class="bi bi-upload"></i> CV</a>
       </div>
     </div>
 
@@ -447,7 +464,7 @@ $initial = strtoupper(substr($user["nom"] ?? "S", 0, 1));
         <div class="cardx">
           <div class="card-head">
             <div>
-              <h2 class="h-title"><i class="bi bi-sliders2-vertical"></i> Ton profil stagiaire</h2>
+              <h2 class="h-title"><i class="bi bi-sliders2-vertical"></i> Mon profil stagiaire</h2>
               <div class="h-sub">Renseigne tes infos pour rendre ton dossier plus attractif.</div>
             </div>
 
@@ -543,7 +560,7 @@ $initial = strtoupper(substr($user["nom"] ?? "S", 0, 1));
           </div>
         </div>
 
-        <div class="footer">© <?= date("Y"); ?> Stage Platform</div>
+        <div class="footer">© <?= date("Y"); ?> InternGo</div>
       </div>
     </div>
 

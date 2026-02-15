@@ -21,7 +21,7 @@ $idUtilisateur = (int) $_SESSION["id_utilisateur"];
 $stmt = $pdo->prepare("
     SELECT 
         u.id_utilisateur, u.nom, u.email, u.role, u.date_inscription,
-        s.id_stagiaire, s.niveau_etude, s.filiere, s.ville AS ville_stagiaire, s.cv
+        s.id_stagiaire, s.niveau_etude, s.filiere, s.ville AS ville_stagiaire, s.cv_path
     FROM utilisateur u
     LEFT JOIN stagiaire s ON s.id_utilisateur = u.id_utilisateur
     WHERE u.id_utilisateur = ?
@@ -408,7 +408,35 @@ $initial = strtoupper(substr($user["nom"] ?? "S", 0, 1));
     }
     .btn-soft:hover{ background: rgba(99,102,241,.14); border-color: rgba(99,102,241,.24); color:#4338ca; }
     .footer-note{ color:#94a3b8; font-size: .85rem; margin-top: 14px; }
-  </style>
+  
+
+    /* Responsive */
+
+    @media (max-width: 992px){
+      .app{ flex-direction: column; }
+      .sidebar{
+        width: 100% !important;
+        position: relative;
+        height: auto;
+        top: auto;
+        border-right: 0;
+        border-bottom: 1px solid rgba(255,255,255,.08);
+      }
+      .main{ padding: 16px 14px 28px; }
+      .topbar{ flex-wrap: wrap; justify-content: flex-start; }
+      .quick-actions{ width: 100%; justify-content: flex-start !important; flex-wrap: wrap; }
+      .grid{ grid-template-columns: 1fr !important; }
+      .card, .panel{ width: 100% !important; }
+    }
+    @media (max-width: 576px){
+      .topbar{ padding: 12px; border-radius: 16px; }
+      .hello h1{ font-size: 1rem; }
+      .stat{ padding: 12px; }
+      .btn{ width: 100%; }
+      .quick-actions .btn{ width: auto; }
+    }
+
+</style>
 </head>
 
 <body>
@@ -426,7 +454,7 @@ $initial = strtoupper(substr($user["nom"] ?? "S", 0, 1));
     </div>
 
     <div class="brand px-2">
-      Stage Platform
+      InternGo
       <small>Dashboard Stagiaire</small>
     </div>
 
@@ -659,10 +687,6 @@ $initial = strtoupper(substr($user["nom"] ?? "S", 0, 1));
                 <i class="bi bi-clipboard-check"></i> Suivre mes candidatures
               </a>
             </div>
-
-            <div class="footer-note">
-              Astuce: si tu es redirigé vers login, vérifie que <b>$_SESSION["id_utilisateur"]</b> existe après connexion.
-            </div>
           </div>
         </div>
 
@@ -692,7 +716,7 @@ $initial = strtoupper(substr($user["nom"] ?? "S", 0, 1));
     </section>
 
     <div class="mt-4 text-center text-muted small">
-      © <?= date("Y"); ?> Stage Platform • Dashboard Stagiaire
+      © <?= date("Y"); ?> InternGo • Dashboard Stagiaire
     </div>
   </main>
 </div>

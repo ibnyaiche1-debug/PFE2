@@ -234,3 +234,22 @@ footer,
     opacity:.35;
   }
 }
+
+
+/* =========================================================
+   Responsive helpers
+   ========================================================= */
+img{ max-width:100%; height:auto; }
+
+@media (max-width: 992px){
+  .wrap .container{ padding-left: 12px; padding-right: 12px; }
+  .brand{ gap: 10px; }
+  .brand .logo{ width: 40px; height: 40px; border-radius: 14px; }
+}
+
+@media (max-width: 576px){
+  .d-flex{ flex-wrap: wrap; }
+  .btn{ width: 100%; }
+  .btn.btn-ghost, .btn.btn-outline-light{ width: auto; }
+  .pill{ font-size: .82rem; }
+}
